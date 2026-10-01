@@ -13,6 +13,8 @@ const resumeMaxPages = Number.isFinite(requestedPageLimit)
 
 export const config = {
   port: Number(process.env.PORT || 4000),
+  host: '0.0.0.0',
+  nodeEnv: process.env.NODE_ENV || 'development',
   openAiApiKey: process.env.OPENAI_API_KEY || '',
   resumeMaxFileSizeMb,
   resumeMaxFileSizeBytes: resumeMaxFileSizeMb * 1024 * 1024,

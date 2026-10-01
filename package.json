@@ -8,7 +8,11 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "server": "node server/index.js"
+    "server": "node server/index.js",
+    "start": "node server/index.js"
+  },
+  "engines": {
+    "node": ">=22.12.0"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.9",

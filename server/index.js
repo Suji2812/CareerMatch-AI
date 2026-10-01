@@ -2,6 +2,7 @@ import express from 'express'
 import cors from 'cors'
 import fs from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import multer from 'multer'
 import { config } from './config.js'
 import { sampleJobs } from './data/jobs.js'
@@ -38,7 +39,15 @@ async function cleanupUploadedFile(req) {
 }
 
 const app = express()
-const uploadDir = path.join(process.cwd(), 'tmp', 'uploads')
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const uploadDir = path.join(projectRoot, 'tmp', 'uploads')
+const distDir = path.join(projectRoot, 'dist')
+const distIndexPath = path.join(distDir, 'index.html')
+
+if (config.nodeEnv === 'production' && !fs.existsSync(distIndexPath)) {
+  throw new Error(`Production frontend build not found at ${distIndexPath}. Run npm run build before starting the server.`)
+}
+
 fs.mkdirSync(uploadDir, { recursive: true })
 
 const upload = multer({
@@ -52,7 +61,9 @@ const upload = multer({
   limits: { files: 1, fileSize: config.resumeMaxFileSizeBytes },
 })
 
-app.use(cors())
+if (config.nodeEnv !== 'production') {
+  app.use(cors())
+}
 app.use(express.json({ limit: '25mb' }))
 
 let latestResumeAnalysis = null
@@ -288,6 +299,20 @@ app.post('/api/jobs/ingest', async (req, res) => {
   res.json({ count: ingested.length, jobs: ingested.map((entry) => entry.metadata) })
 })
 
+if (config.nodeEnv === 'production') {
+  app.use(express.static(distDir, { index: false }))
+  app.use((req, res, next) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD') return next()
+    if (req.path === '/api' || req.path.startsWith('/api/') || req.path === '/health' || req.path.startsWith('/health/')) {
+      return next()
+    }
+
+    res.sendFile(distIndexPath, (error) => {
+      if (error) next(error)
+    })
+  })
+}
+
 app.use((error, _req, res, _next) => {
   if (error instanceof multer.MulterError) {
     const isSizeLimit = error.code === 'LIMIT_FILE_SIZE'
@@ -306,6 +331,6 @@ app.use((error, _req, res, _next) => {
 
 await bootstrapJobs()
 
-app.listen(config.port, () => {
-  console.log(`CareerMatch AI backend listening on http://localhost:${config.port}`)
+app.listen(config.port, config.host, () => {
+  console.log(`CareerMatch AI backend listening on ${config.host}:${config.port} (${config.nodeEnv})`)
 })
